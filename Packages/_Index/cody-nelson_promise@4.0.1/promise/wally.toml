@@ -1,0 +1,10 @@
+[package]
+name = "cody-nelson/promise"
+description = "Promise implementation for Roblox"
+version = "4.0.1"
+license = "MIT"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+include = ["lib", "default.project.json", "LICENSE"]
+
+[dependencies]

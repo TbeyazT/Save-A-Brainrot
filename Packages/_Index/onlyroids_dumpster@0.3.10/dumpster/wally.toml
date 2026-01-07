@@ -1,0 +1,13 @@
+[package]
+name = "onlyroids/dumpster"
+description = "KinqAndi's Dumpster. Returns Promises, Added Get method, and Cleanup for Janitor conversion support"
+version = "0.3.10"
+registry = "https://github.com/UpliftGames/wally-index"
+license = "MIT OR Apache-2.0"
+realm = "shared"
+authors = [
+	"KinqAndi (https://github.com/KinqAndi)",
+	"OnlyRoids"
+]
+include = ["src", "src/**", "wally.toml", "wally.lock", "default.project.json"]
+exclude = ["**"]
