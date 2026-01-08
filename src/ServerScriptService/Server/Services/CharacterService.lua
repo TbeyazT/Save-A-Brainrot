@@ -2,7 +2,9 @@ debug.setmemorycategory(script.Name.." OHA")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
-local Players = game:GetService("Players")
+local PhysicsService    = game:GetService("PhysicsService") -- Added Service
+local Players           = game:GetService("Players")
+local TweenService	  = game:GetService("TweenService")  -- Added Service
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 
@@ -11,6 +13,9 @@ local Knit = require(Packages.Knit)
 local Signal = require(Packages.Signal)
 
 local NPC_TAG = "NPC"
+local COLLISION_GROUP_NAME = "NpcCollideable"
+local PROJECTILE_GROUP_NAME = "Balls"
+
 local CharacterService = Knit.CreateService {
 	Name = script.Name,
 	Client = {},
@@ -22,6 +27,8 @@ function CharacterService:KnitInit()
 
 	self.CharacterAdded = Signal.new()
 	self.CharacterRemoved = Signal.new()
+
+	self:_setupCollisionGroups()
 end
 
 function CharacterService:KnitStart()
@@ -48,6 +55,35 @@ function CharacterService:KnitStart()
 	for _, npc in ipairs(CollectionService:GetTagged(NPC_TAG)) do
 		self:RegisterCharacter(npc, nil)
 	end
+
+	for _, Tower in pairs(ReplicatedStorage:GetDescendants()) do
+		if Tower:FindFirstChild("Humanoid") then
+			self:_applyCollisionGroup(Tower)
+		end
+	end
+end
+
+--// Internal method to register groups
+function CharacterService:_setupCollisionGroups()
+	local success, err = pcall(function()
+		PhysicsService:RegisterCollisionGroup(PROJECTILE_GROUP_NAME)
+		PhysicsService:RegisterCollisionGroup(COLLISION_GROUP_NAME)
+		
+		PhysicsService:CollisionGroupSetCollidable(COLLISION_GROUP_NAME, COLLISION_GROUP_NAME, false)
+		PhysicsService:CollisionGroupSetCollidable(PROJECTILE_GROUP_NAME, COLLISION_GROUP_NAME, false)
+	end)
+	
+	if not success then
+		warn("Collision Group Setup Error:", err)
+	end
+end
+
+function CharacterService:_applyCollisionGroup(model)
+	for _, part in pairs(model:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CollisionGroup = COLLISION_GROUP_NAME
+		end
+	end
 end
 
 function CharacterService:RegisterCharacter(model, player)
@@ -62,12 +98,20 @@ function CharacterService:RegisterCharacter(model, player)
 
 	local dumpster = Dumpster.new()
 
+	self:_applyCollisionGroup(model)
+
+	dumpster:Connect(model.DescendantAdded, function(descendant)
+		if descendant:IsA("BasePart") then
+			descendant.CollisionGroup = COLLISION_GROUP_NAME
+		end
+	end)
+
 	local container = {
 		Model = model,
 		Humanoid = humanoid,
 		RootPart = rootPart,
 		Animator = humanoid:FindFirstChild("Animator") or humanoid:WaitForChild("Animator", 5),
-		Player = player, -- Will be nil for NPCs
+		Player = player,
 		IsPlayer = (player ~= nil),
 		Dumpster = dumpster
 	}
@@ -81,7 +125,6 @@ function CharacterService:RegisterCharacter(model, player)
 	end)
 
 	dumpster:Connect(humanoid.Died, function()
-
 	end)
 
 	self.CharacterAdded:Fire(container)
@@ -111,6 +154,10 @@ function CharacterService:GetCharacter(target)
 		model = target.Parent
 	end
 
+	while model and not model:IsA("Model") and model.Parent ~= game do
+		model = model.Parent
+	end
+
 	if model then
 		return self._registry[model]
 	end
@@ -118,27 +165,63 @@ function CharacterService:GetCharacter(target)
 	return nil
 end
 
-function CharacterService:PushCharacter(target, direction, force, duration)
+function CharacterService:PushCharacter(target, direction, speed, duration)
 	local charData = self:GetCharacter(target)
 	if not charData then return end
 
 	local rootPart = charData.RootPart
+	local humanoid = charData.Humanoid
 
+	-- 1. Create Attachment
 	local attachment = Instance.new("Attachment")
 	attachment.Name = "PushAttachment"
 	attachment.Parent = rootPart
 
+	-- 2. Create LinearVelocity
 	local velocity = Instance.new("LinearVelocity")
 	velocity.Name = "PushVelocity"
 	velocity.Attachment0 = attachment
-	velocity.MaxForce = math.huge 
-	velocity.VectorVelocity = direction.Unit * force 
 	velocity.RelativeTo = Enum.ActuatorRelativeTo.World
+	velocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+	
+	-- [[ CRITICAL: ALLOW GRAVITY ]]
+	-- We force X and Z, but set Y force to 0 so they fall naturally
+	velocity.ForceLimitMode = Enum.ForceLimitMode.PerAxis
+	velocity.MaxAxesForce = Vector3.new(100000, 0, 100000) -- High X/Z, Zero Y
+
+	-- 3. The "Jujutsu" Pop
+	-- We apply the forward velocity to the constraint...
+	local flatVel = Vector3.new(direction.X, 0, direction.Z).Unit * speed
+	velocity.VectorVelocity = flatVel
+	
+	-- ...BUT we manually apply a Y-impulse to the part directly to lift them off the floor.
+	-- This breaks friction instantly and makes it feel "weighty".
+	rootPart.AssemblyLinearVelocity = rootPart.AssemblyLinearVelocity + Vector3.new(0, 25, 0) 
+
 	velocity.Parent = attachment
 
-	task.delay(duration or 0.2, function()
-		if attachment and attachment.Parent then
-			attachment:Destroy()
+	-- 4. Disable Rotation temporarily for a cleaner slide
+	local oldAutoRotate = humanoid.AutoRotate
+	humanoid.AutoRotate = false
+
+	-- 5. The "Butter" Slide (Exponential Easing)
+	-- Exponential Out feels much more like physical sliding than Quad
+	local tweenInfo = TweenInfo.new(duration or 0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+	
+	local tween = TweenService:Create(velocity, tweenInfo, {
+		VectorVelocity = Vector3.new(0, 0, 0)
+	})
+	
+	tween:Play()
+
+	-- 6. Cleanup
+	task.delay(duration or 0.4, function()
+		if attachment then attachment:Destroy() end
+		if tween then tween:Destroy() end
+		
+		-- Restore rotation if the humanoid is still there
+		if humanoid and humanoid.Parent then
+			humanoid.AutoRotate = oldAutoRotate
 		end
 	end)
 end

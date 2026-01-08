@@ -19,7 +19,9 @@ local CloneAsset = ReplicatedStorage.Assets.Models.Capes.Cube:Clone()
 CloneAsset.Weld.Part0 = player.Character.Torso
 CloneAsset.Parent = player.Character
 warn(CloneAsset)
-
+--[[
 local a=Instance.new("Highlight")
 a.Parent = player.Character
 a.FillTransparency = 1
+]]
+

@@ -1,0 +1,13 @@
+[package]
+name = "cody-nelson/trove"
+description = "Less jank sleitnick trove"
+version = "0.0.1"
+license = "MIT"
+authors = ["Cody Nelson"]
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+exclude = []
+include = ["README.md", "default.project.json"]
+
+[dependencies]
+t = "osyrisrblx/t@3.1.1"

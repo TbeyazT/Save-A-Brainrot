@@ -8,6 +8,11 @@ version = "4.0.1"
 dependencies = []
 
 [[package]]
+name = "cody-nelson/trove"
+version = "0.0.1"
+dependencies = [["t", "osyrisrblx/t@3.1.1"]]
+
+[[package]]
 name = "evaera/promise"
 version = "4.0.0"
 dependencies = []
@@ -103,9 +108,14 @@ version = "0.3.10"
 dependencies = []
 
 [[package]]
+name = "osyrisrblx/t"
+version = "3.1.1"
+dependencies = []
+
+[[package]]
 name = "pc/growabrainrot"
 version = "0.1.0"
-dependencies = [["BufferUtil", "sleitnick/buffer-util@0.3.2"], ["Comm", "sleitnick/comm@1.0.1"], ["Component", "sleitnick/component@2.4.8"], ["Concur", "sleitnick/concur@0.1.2"], ["Dumpster", "onlyroids/dumpster@0.3.10"], ["EnumList", "sleitnick/enum-list@2.1.0"], ["Find", "sleitnick/find@1.0.0"], ["Input", "sleitnick/input@3.0.0"], ["Knit", "sleitnick/knit@1.7.0"], ["Loader", "sleitnick/loader@2.0.0"], ["Log", "sleitnick/log@0.1.2"], ["Net", "sleitnick/net@0.2.0"], ["Option", "sleitnick/option@1.0.5"], ["PID", "sleitnick/pid@2.1.0"], ["Promise", "cody-nelson/promise@4.0.1"], ["Quaternion", "sleitnick/quaternion@0.2.3"], ["Query", "sleitnick/query@0.2.0"], ["React", "jsdotlua/react@17.2.1"], ["ReactRoblox", "jsdotlua/react-roblox@17.2.1"], ["Sequent", "sleitnick/sequent@0.1.0"], ["Ser", "sleitnick/ser@1.0.5"], ["Shake", "sleitnick/shake@1.1.0"], ["Signal", "sleitnick/signal@2.0.3"], ["Silo", "sleitnick/silo@0.2.0"], ["Spring", "sleitnick/spring@1.0.0"], ["Streamable", "sleitnick/streamable@1.2.4"], ["Symbol", "sleitnick/symbol@2.0.1"], ["TableUtil", "sleitnick/table-util@1.2.1"], ["TaskQueue", "sleitnick/task-queue@1.0.0"], ["Timer", "sleitnick/timer@2.0.0"], ["Tree", "sleitnick/tree@1.1.0"], ["WaitFor", "sleitnick/wait-for@1.0.0"], ["react", "jsdotlua/react@17.2.1"]]
+dependencies = [["BufferUtil", "sleitnick/buffer-util@0.3.2"], ["Comm", "sleitnick/comm@1.0.1"], ["Component", "sleitnick/component@2.4.8"], ["Concur", "sleitnick/concur@0.1.2"], ["Dumpster", "onlyroids/dumpster@0.3.10"], ["EnumList", "sleitnick/enum-list@2.1.0"], ["Find", "sleitnick/find@1.0.0"], ["Input", "sleitnick/input@3.0.0"], ["Knit", "sleitnick/knit@1.7.0"], ["Loader", "sleitnick/loader@2.0.0"], ["Log", "sleitnick/log@0.1.2"], ["Net", "sleitnick/net@0.2.0"], ["Option", "sleitnick/option@1.0.5"], ["PID", "sleitnick/pid@2.1.0"], ["Promise", "cody-nelson/promise@4.0.1"], ["Quaternion", "sleitnick/quaternion@0.2.3"], ["Query", "sleitnick/query@0.2.0"], ["React", "jsdotlua/react@17.2.1"], ["ReactRoblox", "jsdotlua/react-roblox@17.2.1"], ["Sequent", "sleitnick/sequent@0.1.0"], ["Ser", "sleitnick/ser@1.0.5"], ["Shake", "sleitnick/shake@1.1.0"], ["Signal", "sleitnick/signal@2.0.3"], ["Silo", "sleitnick/silo@0.2.0"], ["Spring", "sleitnick/spring@1.0.0"], ["Streamable", "sleitnick/streamable@1.2.4"], ["Symbol", "sleitnick/symbol@2.0.1"], ["TableUtil", "sleitnick/table-util@1.2.1"], ["TaskQueue", "sleitnick/task-queue@1.0.0"], ["Timer", "sleitnick/timer@2.0.0"], ["Tree", "sleitnick/tree@1.1.0"], ["Trove", "cody-nelson/trove@0.0.1"], ["WaitFor", "sleitnick/wait-for@1.0.0"], ["react", "jsdotlua/react@17.2.1"]]
 
 [[package]]
 name = "sleitnick/buffer-util"

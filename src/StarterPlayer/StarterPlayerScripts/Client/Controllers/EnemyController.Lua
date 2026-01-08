@@ -32,35 +32,32 @@ local MainGui = PlayerGui:WaitForChild("MainGui", 30)
 
 local RNG = Random.new(69)
 
-local GuiController = Knit.CreateController {Name = "GuiController"}
+local EnemeyController = Knit.CreateController {Name = "EnemyController"}
 
-function GuiController:Init() warn("Well i mean the gui controller initialized") end
-
-function GuiController:KnitInit()
-    self.InputController = Knit.GetController("InputController")
-    self.CharacterController = Knit.GetController("CharacterController")
-    self.ProfileController = Knit.GetController("ProfileController")
-
-    task.spawn(function()
-        repeat
-            local success = pcall(function()
-                StarterGui:SetCore("ResetButtonCallback", false)
-            end)
-            task.wait(1)
-        until success
-        print("SUCCESS | Reset button core GUI disabled!")
-    end)
-end
-
-function GuiController:KnitStart()
-    repeat task.wait(0.3) until self.ProfileController:IsLoaded()
-    self:Init()
-    local skybox = Lighting:FindFirstChildWhichIsA("Sky")
-    if skybox then 
-        RunService.RenderStepped:Connect(function()
-            skybox.SkyboxOrientation = Vector3.new(tick() * 10 % 360, tick() * 10 % 360, tick() * 10 % 360)
-        end)
+function EnemeyController:GetEnemyProperties(Name)
+    local Module = Assets.Enemies:FindFirstChild(Name)
+    if Module and Module:IsA("ModuleScript") then 
+        local EnemyProperties = require(Module)
+        return EnemyProperties
     end
 end
 
-return GuiController
+function EnemeyController:GetEnemyModel(Name)
+    local Module = Assets.Enemies:FindFirstChild(Name)
+    if Module and Module:IsA("ModuleScript") then 
+        local Model = Module:FindFirstChildWhichIsA("Model")
+        if Model then
+            return Model
+        end
+    end
+end
+
+function EnemeyController:KnitInit()
+    self.ProfileController = Knit.GetController("ProfileController")
+end
+
+function EnemeyController:KnitStart()
+    repeat task.wait(0.3) until self.ProfileController:IsLoaded()
+end
+
+return EnemeyController
