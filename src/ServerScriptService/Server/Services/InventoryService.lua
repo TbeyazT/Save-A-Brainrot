@@ -38,17 +38,17 @@ end
 function InventoryService:KnitInit()
 	self.ActiveTools = {}
 
-	self.Client.RegisterHit:Connect(function(Player, Data)
-		if not Player.Character then return end
-		local toolInstance = self.ActiveTools[Player.Character] 
+	self.Client.RegisterHit:Connect(function(Player,Character, Data)
+		if not Character then return end
+		local toolInstance = self.ActiveTools[Character] 
 		if toolInstance then
 			toolInstance:ProcessHit(Data)
 		end
 	end)
 
-	self.Client.RegisterFunction:Connect(function(Player, Data)
-		if not Player.Character then return end
-		local toolInstance = self.ActiveTools[Player.Character]
+	self.Client.RegisterFunction:Connect(function(Player,Character, Data)
+		if not Character then return end
+		local toolInstance = self.ActiveTools[Character]
 		if toolInstance and typeof(toolInstance.ProcessFunction) == "function" then
 			toolInstance:ProcessFunction(Data)
 		end
@@ -91,58 +91,74 @@ function InventoryService:KnitStart()
 	end)
 end
 
-function InventoryService:EquipTool(character, toolOrName)
-	local toolModel
-	
-	if type(toolOrName) == "string" then
-		local sourceModel = self:GetToolModel(toolOrName)
-		if not sourceModel then 
-			warn("InventoryService: Could not find model for " .. toolOrName)
-			return 
+function InventoryService:EquipTool(character, toolOrName, npcClass)
+	if not npcClass then
+		local toolModel
+			
+		if type(toolOrName) == "string" then
+			local sourceModel = self:GetToolModel(toolOrName)
+			if not sourceModel then 
+				warn("InventoryService: Could not find model for " .. toolOrName)
+				return 
+			end
+			
+			toolModel = sourceModel:Clone()
+			toolModel.Parent = character 
+		else
+			toolModel = toolOrName
 		end
 		
-		toolModel = sourceModel:Clone()
-		toolModel.Parent = character 
-	else
-		toolModel = toolOrName
-	end
-	
-	local currentData = self.ActiveTools[character]
-	if currentData and currentData.Tool == toolModel then 
-		return 
-	end
-
-	self:UnequipTool(character)
-
-	local RightArm = character:FindFirstChild("Right Arm") or character:FindFirstChild("RightHand")
-
-	if RightArm then
-		if toolModel:IsA("Tool") then
-			task.defer(function()
-				local RightGrip = RightArm:FindFirstChild("RightGrip")
-				if RightGrip then RightGrip:Destroy() end
-			end)
+		local currentData = self.ActiveTools[character]
+		if currentData and currentData.Tool == toolModel then 
+			return 
 		end
-
-		local motor = toolModel:FindFirstChildWhichIsA("Motor6D", true)
-		if motor then
-			motor.Part0 = RightArm
-			if not motor.Part1 and toolModel:FindFirstChild("Handle") then
-				motor.Part1 = toolModel.Handle
+	
+		self:UnequipTool(character)
+	
+		local RightArm = character:FindFirstChild("Right Arm") or character:FindFirstChild("RightHand")
+	
+		if RightArm then
+			if toolModel:IsA("Tool") then
+				task.defer(function()
+					local RightGrip = RightArm:FindFirstChild("RightGrip")
+					if RightGrip then RightGrip:Destroy() end
+				end)
+			end
+	
+			local motor = toolModel:FindFirstChildWhichIsA("Motor6D", true)
+			if motor then
+				motor.Part0 = RightArm
+				if not motor.Part1 and toolModel:FindFirstChild("Handle") then
+					motor.Part1 = toolModel.Handle
+				end
 			end
 		end
-	end
-
-	local ToolClassModule = Assets.ToolClasses:FindFirstChild(toolModel.Name)
-	if not ToolClassModule then return end
-	local ToolClass = require(ToolClassModule)
-
-	local player = Players:GetPlayerFromCharacter(character)
-
-	local newInstance = ToolClass.new(player, toolModel, character) 
 	
-	self.ActiveTools[character] = newInstance
-	return newInstance
+		local ToolClassModule = Assets.ToolClasses:FindFirstChild(toolModel.Name)
+		if not ToolClassModule then return end
+		local ToolClass = require(ToolClassModule)
+	
+		local player = Players:GetPlayerFromCharacter(character)
+	
+		local newInstance = ToolClass.new(player, toolModel, character) 
+		
+		self.ActiveTools[character] = newInstance
+		return newInstance	
+	else
+		local currentData = self.ActiveTools[npcClass.ID]
+		if currentData and currentData.Tool == toolOrName then 
+			return 
+		end
+	
+		self:UnequipTool(npcClass.ID)
+		local ToolClassModule = Assets.ToolClasses:FindFirstChild(toolOrName)
+		if not ToolClassModule then return end
+		local ToolClass = require(ToolClassModule)
+
+		local newInstance = ToolClass.new(nil, toolOrName, character) 
+		self.ActiveTools[npcClass.ID] = newInstance
+		return newInstance
+	end
 end
 
 function InventoryService:UnequipTool(character)
@@ -151,7 +167,7 @@ function InventoryService:UnequipTool(character)
 		if instance.Destroy then
 			instance:Destroy()
 		end
-		if instance.Tool and instance.Tool.Parent == character then
+		if typeof(instance.Tool) == "Instance" then
 			instance.Tool:Destroy()
 		end
 		self.ActiveTools[character] = nil

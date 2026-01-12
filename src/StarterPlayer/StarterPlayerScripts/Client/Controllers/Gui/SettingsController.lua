@@ -17,6 +17,13 @@ local TableUtil = require(Packages.TableUtil)
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer.PlayerGui
 
+local MainGui = PlayerGui:WaitForChild("MainGui")
+
+local Settings = MainGui.settings
+local SFrame = Settings.settings
+
+local temp = SFrame:FindFirstChild("Template")
+
 local OnColor = ColorSequence.new({
 	ColorSequenceKeypoint.new(0,Color3.fromRGB(0,255,8)),
 	ColorSequenceKeypoint.new(1,Color3.fromRGB(42,173,68))
@@ -38,40 +45,38 @@ function SettingsController:GetSetting(Name)
 end
 
 function SettingsController:Init()
-	--[[
 	self.ProfileController:Get("Settings"):andThen(function(Data)
-			for Name,Bool in pairs(Data) do
-				local Frame = temp:Clone()
-				local button = Frame:FindFirstChildWhichIsA("GuiButton")
-				
-				if button then
-					local gradient = button:FindFirstChildWhichIsA("UIGradient")
-					local gradientClass 
-					Frame.Name = Name
-					Frame.TextLabel.Text = Name
-					button.TextLabel.Text = Bool and "ON" or "OFF"
-					if gradient then
-						gradientClass = GradientComponent.new(gradient)
-						gradient.Color = Bool and OnColor or OffColor
-					end
-					
-					Frame.Parent = SFrame
-					
-					local class = AnimationComponent.new(button)
-					class:Init(nil,function()
-						self.ProfileService:ChangeSetting(Name):andThen(function(value)
-							button.TextLabel.Text = value and "ON" or "OFF"
-							if gradient then
-								gradientClass:Lerp(gradient.Color,value and OnColor or OffColor,0.3)
-							end
-						end)
-					end)
-					
-					Frame.Visible = true
+		for Name,Bool in pairs(Data) do
+			local Frame = temp:Clone()
+			local button = Frame:FindFirstChildWhichIsA("GuiButton")
+			
+			if button then
+				local gradient = button:FindFirstChildWhichIsA("UIGradient")
+				local gradientClass 
+				Frame.Name = Name
+				Frame.TextLabel.Text = Name
+				button.TextLabel.Text = Bool and "ON" or "OFF"
+				if gradient then
+					gradientClass = GradientComponent.new(gradient)
+					gradient.Color = Bool and OnColor or OffColor
 				end
+				
+				Frame.Parent = SFrame
+				
+				local class = AnimationComponent.new(button)
+				class:Init(nil,function()
+					self.ProfileService:ChangeSetting(Name):andThen(function(value)
+						button.TextLabel.Text = value and "ON" or "OFF"
+						if gradient then
+							gradientClass:Lerp(gradient.Color,value and OnColor or OffColor,0.3)
+						end
+					end)
+				end)
+				
+				Frame.Visible = true
 			end
-		end)
-	]]
+		end
+	end)
 end
 
 function SettingsController:KnitInit()

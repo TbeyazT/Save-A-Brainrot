@@ -6,6 +6,8 @@ local Assets = ReplicatedStorage:WaitForChild("Assets")
 
 local Trove = require(Packages.Trove) 
 local Knit = require(Packages.Knit)
+local Shake = require(Packages.Shake)
+
 local ShapeCast = require(Assets.Modules.ShapecastHitbox)
 
 local Client = {}
@@ -20,10 +22,14 @@ function Client.new(Player: Player, Tool: Model, Character: Model)
 	self.Character = Character or Player.Character or Player.CharacterAdded:Wait()
 	self.Humanoid = self.Character:WaitForChild("Humanoid")
 	self.Animator = self.Humanoid:WaitForChild("Animator")
+	warn("Creating ClassicSword for player:", Player, "Character:", self.Character.Name)
+	self.IsNPC = (typeof(Player) == "string")
+	warn(self.IsNPC and "ClassicSword is for NPC" or "ClassicSword is for Player",Player)
 
 	self.InputController = Knit.GetController("InputController")
-	
 	self.InventoryService = Knit.GetService("InventoryService")
+	self.InventoryController = Knit.GetController("InventoryController")
+	self.CharacterController = Knit.GetController("CharacterController")
 
 	self.Tool = Tool
 	self.ToolProperties = require(Assets.ToolProperties:FindFirstChild(Tool.Name))
@@ -34,7 +40,8 @@ function Client.new(Player: Player, Tool: Model, Character: Model)
 
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayParams.FilterDescendantsInstances = {self.Character}
+	rayParams.FilterDescendantsInstances = {self.Character,self.Tool}
+	warn("Creating Hitbox for tool: " .. Tool.Name, " with params: ", rayParams,self.Character)
 
 	self.Hitbox = ShapeCast.new(Tool, rayParams)
 	
@@ -77,8 +84,15 @@ function Client:Init()
 		if hitHumanoid and hitHumanoid ~= self.Humanoid then
 			if not self.HitList[hitHumanoid] then
 				self.HitList[hitHumanoid] = true
-				
-				self.InventoryService.RegisterHit:Fire({
+				local attackerArg = self.IsNPC and self.Player or self.Character
+
+				self.CharacterController:OnHit(hitModel, {
+					Humanoid = hitHumanoid,
+					Position = raycastResult.Position,
+				})
+
+				self.InventoryService.RegisterHit:Fire(attackerArg, {
+					ID = not self.IsNPC and hitModel.Name,
 					Humanoid = hitHumanoid,
 					Position = raycastResult.Position,
 				})
@@ -115,6 +129,7 @@ function Client:Swing()
 	if AttackAnim then
 		AttackAnim:Play()
 		self.Hitbox:HitStart()
+		self.InventoryController.ActivatedTool:Fire(self.Character, self.Tool)
 	end
 
 	self.Trove:Add(task.delay(self.ToolProperties.Cooldown, function()

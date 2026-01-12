@@ -25,7 +25,15 @@ function PurchaseController:KnitInit()
 end
 
 function PurchaseController:KnitStart()
-	repeat task.wait(0.3) until self.ProfileController:IsLoaded()
+	local attempts = 0
+	while not self.ProfileController:IsLoaded() do
+		task.wait(0.5)
+		attempts += 1
+		if attempts > 20 then
+			warn("ProfileController took too long to load! forcing "..script.Name.." initialization.")
+			break
+		end
+	end
 end
 
 return PurchaseController

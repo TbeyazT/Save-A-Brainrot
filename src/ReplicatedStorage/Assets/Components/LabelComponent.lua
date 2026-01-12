@@ -1,8 +1,8 @@
 --[[
 	// FileName: RichTextComponent.lua
 	// Description: Converts TextLabel into Word Frames containing Letter Labels.
-	// Update: Adds Binary Search for accurate TextScaled emulation.
-	@TbeyazT 2025
+	// Fixes: Uses Cumulative Measurement for 100% accurate wrapping and positioning.
+	@TbeyazT 2026
 --]]
 
 local ReplicatedStorage 	= game:GetService("ReplicatedStorage")
@@ -20,27 +20,23 @@ export type WordObject = { WordString: string, Frame: Frame, Letters: { Letter }
 
 --// Helper: Calculate the exact Font Size to fit the frame
 local function calculateBestFontSize(text: string, font: Enum.Font, frameSize: Vector2, template: TextLabel): number
-	-- If TextScaled is OFF, just use the set size
 	if not template.TextScaled then
 		return template.TextSize
 	end
 
-	-- If TextScaled is ON, we must find the largest size that fits
 	local minSize = 1
-	local maxSize = 100 -- Cap at 100 to prevent massive text, or use frameSize.Y
+	local maxSize = 100 
 	local bestSize = minSize
 	
-	-- Binary search for the perfect size
-	local textWidthLimit = frameSize.X
+	-- We create a huge vector for Y to strictly test X, and vice versa
+	local layoutConstraint = Vector2.new(frameSize.X, 10000)
 	
 	while minSize <= maxSize do
 		local mid = math.floor((minSize + maxSize) / 2)
+		local bounds = TextService:GetTextSize(text, mid, font, layoutConstraint)
 		
-		-- Ask Roblox: "If I use this font size, how big is the text?"
-		local bounds = TextService:GetTextSize(text, mid, font, Vector2.new(textWidthLimit, 10000))
-		
-		-- Check if it fits vertically inside the frame
-		if bounds.Y <= frameSize.Y then
+		-- STRICT check: Must fit X and Y exactly. No tolerance multipliers.
+		if bounds.X <= frameSize.X and bounds.Y <= frameSize.Y then
 			bestSize = mid
 			minSize = mid + 1
 		else
@@ -51,7 +47,6 @@ local function calculateBestFontSize(text: string, font: Enum.Font, frameSize: V
 	return bestSize
 end
 
---// Constructor
 function RichTextComponent.new(template: TextLabel)
 	local self = setmetatable({}, RichTextComponent)
 
@@ -62,7 +57,7 @@ function RichTextComponent.new(template: TextLabel)
 	frame.AnchorPoint = template.AnchorPoint
 	frame.BackgroundTransparency = 1
 	frame.ZIndex = template.ZIndex
-	frame.ClipsDescendants = template.ClipsDescendants
+	frame.ClipsDescendants = template.ClipsDescendants -- Important for slight overflows
 	frame.Parent = template.Parent
 
 	self.Frame = frame
@@ -78,13 +73,11 @@ function RichTextComponent.new(template: TextLabel)
 	self._Template = template
 	self._UpdateDebounce = false
 
-	-- Hide the template but keep it for reference
 	template.BackgroundTransparency = 1
 	template.TextTransparency = 1 
 	local stroke = template:FindFirstChildWhichIsA("UIStroke")
 	if stroke then stroke.Enabled = false end
 
-	-- Initial Size calculation
 	self.TextSize = template.TextSize
 
 	frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() self:UpdateScale() end)
@@ -92,193 +85,189 @@ function RichTextComponent.new(template: TextLabel)
 	return self
 end
 
---// Core Logic
 function RichTextComponent:SetText(text: string)
 	self:Clear()
 	self.Text = text
-	self._Template.Text = text -- Keep template in sync
+	self._Template.Text = text
 
 	local frameSize = self.Frame.AbsoluteSize
 	if frameSize.X <= 1 or frameSize.Y <= 1 then return end
 
 	-- 1. CALCULATE EXACT SIZE
 	self.TextSize = calculateBestFontSize(text, self.Font, frameSize, self._Template)
-	self.LineHeight = self.TextSize -- Use 1.0 for tighter fit, or 1.1 if needed
-
-	-- 2. Tokenize
-	local tokens = {} 
-	local currentToken = { Text = "", IsSeparator = false }
+	self.LineHeight = self.TextSize * 1.0 -- Tight fit like native Roblox
 	
-	for first, last in utf8.graphemes(text) do
-		local char = string.sub(text, first, last)
-		if char:match("%s") then -- Matches space, tab, newline
-			if #currentToken.Text > 0 then table.insert(tokens, currentToken) end
-			table.insert(tokens, { Text = char, IsSeparator = true })
-			currentToken = { Text = "", IsSeparator = false }
-		else
-			currentToken.Text = currentToken.Text .. char
-		end
+	-- 2. Tokenize (Word by Word)
+	local words = {}
+	for word in text:gmatch("%S+") do
+		table.insert(words, word)
 	end
-	if #currentToken.Text > 0 then table.insert(tokens, currentToken) end
-
-	-- 3. Render Loop
-	local xCursor = 0
-	local yCursor = 0
-	local lineHeightScale = self.LineHeight / frameSize.Y
-	local totalHeight = lineHeightScale
 	
-	local spaceWidth = TextService:GetTextSize(" ", self.TextSize, self.Font, Vector2.new(math.huge, math.huge)).X
-	local spaceScale = spaceWidth / frameSize.X
+	-- We need to preserve manual newlines logic, so we split by newlines first
+	local rawLines = text:split("\n")
 	
-	local wordIndex = 1
-	local globalLetterIndex = 1
-
-	for _, token in ipairs(tokens) do
-		if token.Text == "\n" then
-			xCursor = 0
-			yCursor += lineHeightScale
-			totalHeight += lineHeightScale
-			continue
-		end
-
-		if token.IsSeparator and token.Text == " " then
-			xCursor += spaceScale
-			continue
-		end
-		
-		if token.IsSeparator then continue end -- Skip other whitespace
-
-		-- Measure Word
-		local wordPixelSize = TextService:GetTextSize(token.Text, self.TextSize, self.Font, Vector2.new(math.huge, math.huge))
-		local wordWidthScale = wordPixelSize.X / frameSize.X
-		local wordHeightScale = self.TextSize / frameSize.Y
-
-		-- Wrap
-		if xCursor > 0 and (xCursor + wordWidthScale) > 1 then
-			xCursor = 0
-			yCursor += lineHeightScale
-			totalHeight += lineHeightScale
-		end
-
-		-- Create Word Frame
-		local wordFrame = Instance.new("Frame")
-		wordFrame.Name = "Word_" .. wordIndex
-		wordFrame.BackgroundTransparency = 1
-		wordFrame.Size = UDim2.new(wordWidthScale, 0, wordHeightScale, 0)
-		wordFrame.Position = UDim2.new(xCursor, 0, yCursor, 0)
-		wordFrame.Parent = self.Frame
-		
-		local wordObj = { WordString = token.Text, Frame = wordFrame, Letters = {}, Index = wordIndex }
-
-		local localXCursor = 0
-		
-		for first, last in utf8.graphemes(token.Text) do
-			local char = string.sub(token.Text, first, last)
-			local charSize = TextService:GetTextSize(char, self.TextSize, self.Font, Vector2.new(math.huge, math.huge))
-			
-			local charScaleRel = charSize.X / wordPixelSize.X 
-			local xPosRel = localXCursor / wordPixelSize.X
-
-			local label = Instance.new("TextLabel")
-			label.Name = "Char_" .. char
-			label.Text = char
-			label.Font = self.Font
-			label.TextColor3 = self.TextColor3
-			label.TextSize = self.TextSize
-			label.TextScaled = false -- Must be false, we manually sized it
-			label.BackgroundTransparency = 1
-			label.TextTransparency = 0
-			label.Size = UDim2.new(charScaleRel, 0, 1, 0)
-			label.Position = UDim2.new(xPosRel, 0, 0, 0)
-			label.TextXAlignment = Enum.TextXAlignment.Center
-			label.TextYAlignment = Enum.TextYAlignment.Center
-			label.ZIndex = self._Template.ZIndex
-			label.Parent = wordFrame
-
-			local letterObj = { Char = char, Label = label, Index = globalLetterIndex }
-			table.insert(wordObj.Letters, letterObj)
-			table.insert(self.Letters, letterObj)
-
-			localXCursor += charSize.X
-			globalLetterIndex += 1
-		end
-		
-		table.insert(self.Words, wordObj)
-		xCursor += wordWidthScale
-		wordIndex += 1
-	end
-
-	self:ApplyAlignment(totalHeight)
-	self.Changed:Fire(self.Words)
-end
-
-function RichTextComponent:ApplyAlignment(totalHeightScale)
-	if not self.Frame or #self.Words == 0 then return end
-	
-	local frame = self.Frame
-	local lineTolerance = (self.LineHeight / frame.AbsoluteSize.Y) * 0.5 -- Increased tolerance slightly
+	-- 3. Logical Layout (Cumulative Measurement)
 	local lines = {}
+	local bigVector = Vector2.new(math.huge, math.huge)
+	
+	for _, rawLineStr in ipairs(rawLines) do
+		-- If line is empty (double newline), just add an empty placeholder
+		if rawLineStr == "" then
+			table.insert(lines, { Width = 0, Tokens = {} })
+			continue
+		end
 
-	for _, wordObj in ipairs(self.Words) do
-		local yScale = wordObj.Frame.Position.Y.Scale
-		local found = false
-		for _, line in ipairs(lines) do
-			if math.abs(line.Y - yScale) < lineTolerance then
-				table.insert(line.Words, wordObj)
-				found = true
-				break
+		local currentLine = { Width = 0, Tokens = {} }
+		local currentLineString = ""
+		
+		-- Extract tokens (Words and Spaces) from this specific line
+		local tokens = {}
+		local tempStr = ""
+		for first, last in utf8.graphemes(rawLineStr) do
+			local char = string.sub(rawLineStr, first, last)
+			if char == " " then
+				if tempStr ~= "" then table.insert(tokens, {Text = tempStr, IsSpace = false}) tempStr = "" end
+				table.insert(tokens, {Text = " ", IsSpace = true})
+			else
+				tempStr = tempStr .. char
 			end
 		end
-		if not found then table.insert(lines, { Y = yScale, Words = { wordObj } }) end
+		if tempStr ~= "" then table.insert(tokens, {Text = tempStr, IsSpace = false}) end
+
+		-- Process wrapping
+		for _, token in ipairs(tokens) do
+			local textToAdd = token.Text
+			
+			-- Measure what the line WOULD look like with this new token
+			local testString = currentLineString .. textToAdd
+			local testBounds = TextService:GetTextSize(testString, self.TextSize, self.Font, bigVector)
+			
+			-- Wrap check (ignore if line is empty, must fit at least one word)
+			if testBounds.X > frameSize.X and #currentLine.Tokens > 0 then
+				-- Finalize current line
+				currentLine.Width = TextService:GetTextSize(currentLineString, self.TextSize, self.Font, bigVector).X
+				table.insert(lines, currentLine)
+				
+				currentLine = { Width = 0, Tokens = {} }
+				currentLineString = ""
+				
+				if token.IsSpace then 
+					continue 
+				end
+			end
+			
+			table.insert(currentLine.Tokens, token)
+			currentLineString = currentLineString .. textToAdd
+		end
+		
+		if #currentLine.Tokens > 0 then
+			currentLine.Width = TextService:GetTextSize(currentLineString, self.TextSize, self.Font, bigVector).X
+			table.insert(lines, currentLine)
+		end
 	end
 
-	table.sort(lines, function(a, b) return a.Y < b.Y end)
-
-	local offsetYScale = 0
+	local totalContentHeight = #lines * self.LineHeight
+	local startYOffset = 0
+	
 	if self.TextYAlignment == Enum.TextYAlignment.Center then
-		offsetYScale = (1 - totalHeightScale) / 2
+		startYOffset = (frameSize.Y - totalContentHeight) / 2
 	elseif self.TextYAlignment == Enum.TextYAlignment.Bottom then
-		offsetYScale = 1 - totalHeightScale
+		startYOffset = frameSize.Y - totalContentHeight
 	end
 
-	for i, line in ipairs(lines) do
-		local firstWord = line.Words[1]
-		local lastWord = line.Words[#line.Words]
-		local lineWidthScale = (lastWord.Frame.Position.X.Scale + lastWord.Frame.Size.X.Scale) - firstWord.Frame.Position.X.Scale
-		
-		local offsetXScale = 0
+	local globalWordIndex = 1
+	local globalLetterIndex = 1
+
+	for lineIndex, lineData in ipairs(lines) do
+		local startXOffset = 0
 		if self.TextXAlignment == Enum.TextXAlignment.Center then
-			offsetXScale = (1 - lineWidthScale) / 2
+			startXOffset = (frameSize.X - lineData.Width) / 2
 		elseif self.TextXAlignment == Enum.TextXAlignment.Right then
-			offsetXScale = 1 - lineWidthScale
+			startXOffset = frameSize.X - lineData.Width
 		end
 		
-		local startX = line.Words[1].Frame.Position.X.Scale
-		local shiftX = offsetXScale - startX
-		local lineYPos = offsetYScale + (i - 1) * (self.LineHeight / frame.AbsoluteSize.Y)
+		local currentX = startXOffset
+		local currentY = startYOffset + ((lineIndex - 1) * self.LineHeight)
+		
+		local lineBuildString = ""
+		
+		for _, token in ipairs(lineData.Tokens) do
+			local prevWidth = 0
+			if lineBuildString ~= "" then
+				prevWidth = TextService:GetTextSize(lineBuildString, self.TextSize, self.Font, bigVector).X
+			end
+			
+			local tokenWidth = TextService:GetTextSize(token.Text, self.TextSize, self.Font, bigVector).X
+			
+			if token.IsSpace then
+				lineBuildString = lineBuildString .. token.Text
+			else
+				local wScale = tokenWidth / frameSize.X
+				local hScale = self.TextSize / frameSize.Y
+				local xScale = (startXOffset + prevWidth) / frameSize.X
+				local yScale = currentY / frameSize.Y
+				
+				local wordFrame = Instance.new("Frame")
+				wordFrame.Name = "Word_" .. globalWordIndex
+				wordFrame.BackgroundTransparency = 1
+				wordFrame.Size = UDim2.new(wScale, 0, hScale, 0)
+				wordFrame.Position = UDim2.new(xScale, 0, yScale, 0)
+				wordFrame.Parent = self.Frame
+				
+				local wordObj = { WordString = token.Text, Frame = wordFrame, Letters = {}, Index = globalWordIndex }
 
-		for _, wordObj in ipairs(line.Words) do
-			local currentX = wordObj.Frame.Position.X.Scale
-			wordObj.Frame.Position = UDim2.new(currentX + shiftX, 0, lineYPos, 0)
+				local localXCursor = 0
+				for first, last in utf8.graphemes(token.Text) do
+					local char = string.sub(token.Text, first, last)
+					local charSize = TextService:GetTextSize(char, self.TextSize, self.Font, bigVector)
+					
+					local charScaleRel = charSize.X / tokenWidth
+					local xPosRel = localXCursor / tokenWidth
+					
+					local label = Instance.new("TextLabel")
+					label.Name = "Char_" .. char
+					label.Text = char
+					label.Font = self.Font
+					label.TextColor3 = self.TextColor3
+					label.TextSize = self.TextSize
+					label.TextScaled = false
+					label.BackgroundTransparency = 1
+					label.TextTransparency = 0
+					label.Size = UDim2.new(charScaleRel, 0, 1, 0)
+					label.Position = UDim2.new(xPosRel, 0, 0, 0)
+					label.TextXAlignment = Enum.TextXAlignment.Center
+					label.TextYAlignment = Enum.TextYAlignment.Center
+					label.ZIndex = self._Template.ZIndex
+					label.Parent = wordFrame
+					
+					local letterObj = { Char = char, Label = label, Index = globalLetterIndex }
+					table.insert(wordObj.Letters, letterObj)
+					table.insert(self.Letters, letterObj)
+					
+					localXCursor += charSize.X
+					globalLetterIndex += 1
+				end
+				
+				table.insert(self.Words, wordObj)
+				lineBuildString = lineBuildString .. token.Text
+				globalWordIndex += 1
+			end
 		end
 	end
+
+	self.Changed:Fire(self.Words)
 end
 
 function RichTextComponent:UpdateScale()
 	if self._UpdateDebounce then return end
 	if not self.Frame or not self.Frame.Parent then return end
 	if self.Frame.AbsoluteSize.X <= 1 then return end
-
-	local newSize = calculateBestFontSize(self.Text, self.Font, self.Frame.AbsoluteSize, self._Template)
 	
-	-- Only update if size changed significantly
-	if math.abs(newSize - self.TextSize) > 1 or #self.Words == 0 then
-		self._UpdateDebounce = true
-		task.defer(function()
-			if self.Frame then self:SetText(self.Text) end
-			self._UpdateDebounce = false
-		end)
-	end
+	self._UpdateDebounce = true
+	task.defer(function()
+		if self.Frame then self:SetText(self.Text) end
+		self._UpdateDebounce = false
+	end)
 end
 
 function RichTextComponent:GetWords() return self.Words end
