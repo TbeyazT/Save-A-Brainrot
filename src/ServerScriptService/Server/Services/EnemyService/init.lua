@@ -89,10 +89,6 @@ function EnemyService:KnitStart()
     Players.PlayerAdded:Connect(function(player)
         player.CharacterAdded:Connect(function(character)
             task.wait(2)
-            self:CreateEnemy(player,{
-                Name = "TbeyazT",
-                CFrame = nil,
-            })
         end)
     end)
 end

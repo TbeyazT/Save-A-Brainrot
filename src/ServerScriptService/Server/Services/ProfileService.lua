@@ -36,7 +36,10 @@ local DATA_TEMPLATE = {
 			Level = 0,
 		}
 	},
-	Tree = "Normal",
+	DiscoveredWorlds = {
+		"Starting"
+	},
+	World = "Starting",
 }
 
 if RunService:IsStudio() then

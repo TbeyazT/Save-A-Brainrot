@@ -72,7 +72,6 @@ function Server:_applyDamage(targetHumanoid)
 
 	if not self.IsNPC then
 		local enemy = self.EnemyService:GetEnemy(targetHumanoid)
-		warn("Applying damage to enemy:", enemy,targetHumanoid)
 		if enemy then
 			enemy:TakeDamage(self.Damage)
 		end

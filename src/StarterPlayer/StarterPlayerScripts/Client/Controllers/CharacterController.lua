@@ -9,7 +9,13 @@ local Knit = require(Packages.Knit)
 local Signal = require(Packages.Signal)
 
 local LocalPlayer = Players.LocalPlayer
+
+local COLLISION_GROUP_NAME = "NpcCollideable"
 local NPC_TAG = "NPC"
+
+-- OPTIMIZATION: Create TweenInfo once, not every hit
+local HIT_TWEEN_INFO = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local HIT_COLOR = Color3.fromRGB(255, 0, 0)
 
 local CharacterController = Knit.CreateController{
 	Name = script.Name
@@ -21,8 +27,8 @@ function CharacterController:KnitInit()
 	self.CharacterAdded = Signal.new()
 	self.CharacterRemoving = Signal.new()
 
-	self.PlayerData = {} -- Keys: Player Instance
-	self.NPCData = {}    -- Keys: Model Instance
+	self.PlayerData = {} 
+	self.NPCData = {}    
 
 	self.Character = nil
 	self.Humanoid = nil
@@ -48,10 +54,19 @@ function CharacterController:LoadAnimation(ID, Animator)
 	end
 end
 
+function CharacterController:_applyCollisionGroup(model)
+	for _, part in pairs(model:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CollisionGroup = COLLISION_GROUP_NAME
+		end
+	end
+end
+
 function CharacterController:Push(targetModel, direction, power, duration)
 	local rootPart = targetModel:FindFirstChild("HumanoidRootPart")
 	if not rootPart then return end
 	
+	-- Ensure we are pushing horizontally only
 	local flatDirection = Vector3.new(direction.X, 0, direction.Z)
 	
 	if flatDirection.Magnitude < 0.001 then
@@ -66,21 +81,37 @@ function CharacterController:Push(targetModel, direction, power, duration)
 	rootPart:ApplyImpulse(impulse)
 end
 
-function CharacterController:OnHit(character: Model, hitData: any)
-	local PlayerData = self.PlayerData[LocalPlayer]
-	if not PlayerData then return end
-
-	if character then
-		local direction = (character.PrimaryPart.Position - PlayerData.RootPart.Position).Unit
-		self:Push(character, direction, 2, 0.4)
+function CharacterController:OnHit(targetModel: Model, attackerModel: Model, hitData: any)
+	if not targetModel or not targetModel.PrimaryPart or targetModel == LocalPlayer.Character then return end
+	
+	local originPos = attackerModel and attackerModel.PrimaryPart and attackerModel.PrimaryPart.Position or self.RootPart.Position
+	local direction = (targetModel.PrimaryPart.Position - originPos).Unit
+	
+	self:Push(targetModel, direction, 2, 0.4)
+	local existingHighlight = targetModel:FindFirstChild("HitHighlight")
+	
+	if existingHighlight then
+		existingHighlight.FillTransparency = 0.5
+		local tween = TweenService:Create(existingHighlight, HIT_TWEEN_INFO, {FillTransparency = 1, OutlineTransparency = 1})
+		tween:Play()
+	else
 		local Highlight = Instance.new("Highlight")
-		Highlight.Adornee = character
-		Highlight.FillColor = Color3.fromRGB(255, 0, 0)
+		Highlight.Name = "HitHighlight"
+		Highlight.Adornee = targetModel
+		Highlight.FillColor = HIT_COLOR
+		Highlight.OutlineColor = HIT_COLOR
 		Highlight.FillTransparency = 0.5
-		TweenService:Create(Highlight, TweenInfo.new(0.4), {FillTransparency = 1, OutlineTransparency = 1}):Play()
-		Highlight.Parent = workspace.Terrain
-		task.delay(0.4, function()
-			Highlight:Destroy()
+		Highlight.OutlineTransparency = 0.5
+		Highlight.Parent = targetModel 
+		
+		local tween = TweenService:Create(Highlight, HIT_TWEEN_INFO, {FillTransparency = 1, OutlineTransparency = 1})
+		tween:Play()
+
+		tween.Completed:Connect(function()
+			if Highlight and Highlight.Parent then
+				Highlight.FillTransparency = 1
+				Highlight.OutlineTransparency = 1
+			end
 		end)
 	end
 end
@@ -178,6 +209,8 @@ function CharacterController:KnitStart()
 				self:OnCharacterRemoving(model)
 			end
 		end)
+
+		self:_applyCollisionGroup(model)
 	end
 
 	CollectionService:GetInstanceAddedSignal(NPC_TAG):Connect(SetupNPC)

@@ -22,9 +22,7 @@ function Client.new(Player: Player, Tool: Model, Character: Model)
 	self.Character = Character or Player.Character or Player.CharacterAdded:Wait()
 	self.Humanoid = self.Character:WaitForChild("Humanoid")
 	self.Animator = self.Humanoid:WaitForChild("Animator")
-	warn("Creating ClassicSword for player:", Player, "Character:", self.Character.Name)
 	self.IsNPC = (typeof(Player) == "string")
-	warn(self.IsNPC and "ClassicSword is for NPC" or "ClassicSword is for Player",Player)
 
 	self.InputController = Knit.GetController("InputController")
 	self.InventoryService = Knit.GetService("InventoryService")
@@ -38,10 +36,14 @@ function Client.new(Player: Player, Tool: Model, Character: Model)
 	self.IsAttacking = false
 	self.HitList = {}
 
+	local filterList = {self.Character, self.Tool}
+	if self.IsNPC and workspace:FindFirstChild("Enemies") then
+		table.insert(filterList, workspace.Enemies)
+	end
+
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayParams.FilterDescendantsInstances = {self.Character,self.Tool}
-	warn("Creating Hitbox for tool: " .. Tool.Name, " with params: ", rayParams,self.Character)
+	rayParams.FilterDescendantsInstances = filterList
 
 	self.Hitbox = ShapeCast.new(Tool, rayParams)
 	
@@ -86,7 +88,7 @@ function Client:Init()
 				self.HitList[hitHumanoid] = true
 				local attackerArg = self.IsNPC and self.Player or self.Character
 
-				self.CharacterController:OnHit(hitModel, {
+				self.CharacterController:OnHit(hitModel, self.Character, {
 					Humanoid = hitHumanoid,
 					Position = raycastResult.Position,
 				})
