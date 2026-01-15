@@ -39,6 +39,7 @@ function Enemy:TakeDamage(Amount)
         CurrentHealth = self.Health,
     })
     if self.Health <= 0 then
+        self.Died:Fire()
         self:Destroy()
     end
 end
@@ -54,7 +55,6 @@ function Enemy:Destroy()
     end
 
     if self.Died then
-        self.Died:Fire()
         self.Died:Destroy()
     end
 

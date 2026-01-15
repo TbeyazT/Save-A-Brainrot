@@ -28,6 +28,7 @@ function Enemy.new(Data)
 
     self.Model = self.EnemyController:GetEnemyModel(self.Properties.Name):Clone()
 
+    self.Data = Data
     self.Health = self.Properties.Health or 100
     self.ID = Data.ID
     self.Alive = true
@@ -43,10 +44,14 @@ function Enemy:Init()
     self.Model.Name = self.ID
     self.Model.Parent = enemiesFolder
     
-    if self.Properties.SpawnLocation and typeof(self.Properties.SpawnLocation) == "CFrame" then
-        self.Model:PivotTo(self.Properties.SpawnLocation)
+    if typeof(self.Data.CFrame) then
+        self.Model:PivotTo(self.Data.CFrame)
     else
-        self.Model:PivotTo(CFrame.new(0, 5, 0))
+        if self.Properties.SpawnLocation and typeof(self.Properties.SpawnLocation) == "CFrame" then
+            self.Model:PivotTo(self.Properties.SpawnLocation)
+        else
+            self.Model:PivotTo(CFrame.new(0, 5, 0))
+        end
     end
 
     CollectionService:AddTag(self.Model, "NPC")
@@ -106,7 +111,9 @@ function Enemy:Destroy()
     self.Connections = nil
 
     if self.Pathway then
-        self.Pathway:Stop()
+        if self.Pathway._status ~= "idle" then
+            self.Pathway:Stop()
+        end
         self.Pathway:Destroy()
         self.Pathway = nil 
     end

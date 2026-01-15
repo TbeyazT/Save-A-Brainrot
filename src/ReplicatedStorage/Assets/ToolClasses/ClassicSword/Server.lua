@@ -6,6 +6,7 @@ local Assets = ReplicatedStorage:FindFirstChild("Assets")
 
 local Knit = require(Packages.Knit)
 local Trove = require(Packages.Trove)
+local TableUtil = require(Packages.TableUtil)
 local ShapeCast = require(Assets.Modules.ShapecastHitbox) 
 
 local Server = {}
@@ -24,6 +25,7 @@ function Server.new(Player: Player?, Tool: Model, Character: Model)
 
 	self.CharacterService = Knit.GetService("CharacterService")
 	self.EnemyService = Knit.GetService("EnemyService")
+	self.StageService = Knit.GetService("StageService")
 	
 	self.ToolProperties = self.IsNPC and require(Assets.ToolProperties:FindFirstChild(Tool)) or 
 		require(Assets.ToolProperties:FindFirstChild(Tool.Name))
@@ -71,13 +73,17 @@ function Server:_applyDamage(targetHumanoid)
 	local victimData = self.IsNPC and self.CharacterService:GetCharacter(targetHumanoid.Parent)
 
 	if not self.IsNPC then
-		local enemy = self.EnemyService:GetEnemy(targetHumanoid)
+		local enemy = self.EnemyService:GetEnemy(targetHumanoid) -- target humanoid is an id cause the player attacks the npcs!!
 		if enemy then
 			enemy:TakeDamage(self.Damage)
 		end
 	else
-		if victimData and victimData.Humanoid.Health <= 0 then return end
-		targetHumanoid:TakeDamage(self.Damage)
+		if victimData.Player then
+			local playerState = TableUtil.Copy(self.StageService:GetPlayerState(victimData.Player))
+			if playerState and playerState.Health <= 0 then return end
+			warn("dealing")
+			self.StageService:TakeDamage(victimData.Player,self.Damage)
+		end
 	end
 end
 

@@ -25,9 +25,11 @@ local STORE_VERSION = 4
 local DATA_TEMPLATE = {
 	Cash = 200,
 	LastLogin = 0,
+	MaxHealth = 200,
 	Settings = {
 		["Game Musics"] = true
 	},
+	Gamepasses = {},
 	Pets = {
 		{
 			Name = "67",
@@ -89,11 +91,19 @@ function ProfileService:IsLoaded(player: Player): boolean
 	local profile = self._profiles[player]
 	return profile ~= nil and profile:IsActive()
 end
+
 function ProfileService:Get(player: Player, key: string): any
 	local profile = self._profiles[player]
 	if not profile then return nil end
 
 	return profile.Data[key]
+end
+
+function ProfileService:GetProfile(player:Player): table
+	local profile = self._profiles[player]
+	if not profile then return nil end
+
+	return profile
 end
 
 function ProfileService:GetAllData(player: Player): table?

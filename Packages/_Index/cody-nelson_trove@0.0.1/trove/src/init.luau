@@ -410,6 +410,7 @@ end
 	Alias for `trove:Clean()`.
 ]=]
 function Trove:Destroy()
+	warn("cleaning trove",debug.traceback())
 	self:Clean()
 end
 

@@ -397,13 +397,15 @@ function GuiController:KnitInit()
     self.GlowEffects = {}
 
     task.spawn(function()
-        repeat
-            local success = pcall(function()
-                StarterGui:SetCore("ResetButtonCallback", false)
-            end)
-            task.wait(1)
-        until success
-        print("SUCCESS | Reset button core GUI disabled!")
+        if not RunService:IsStudio() then
+			repeat
+				local success = pcall(function()
+					StarterGui:SetCore("ResetButtonCallback", false)
+				end)
+				task.wait(1)
+			until success
+			print("SUCCESS | Reset button core GUI disabled!")
+        end
     end)
 end
 

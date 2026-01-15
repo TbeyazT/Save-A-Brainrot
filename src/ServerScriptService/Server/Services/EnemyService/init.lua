@@ -1,11 +1,9 @@
-debug.setmemorycategory(script.Name.." OHA")
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 local Players           = game:GetService("Players")
 
-local Assets = ReplicatedStorage:WaitForChild("Assets")
-local Packages = ReplicatedStorage:WaitForChild("Packages")
+local Assets = ReplicatedStorage:FindFirstChild("Assets")
+local Packages = ReplicatedStorage:FindFirstChild("Packages")
 
 local Dumpster = require(Packages.Dumpster)
 local Knit = require(Packages.Knit)
@@ -70,12 +68,13 @@ function EnemyService:CreateEnemy(Players,Data)
                     self.Client.CreateEnemy:Fire(player,{
                         Name = Data.Name,
                         ID = enemyInstance.ID,
-                        CFrame = Data.CFrame or nil,
+                        CFrame = Data.CFrame,
                     })
                 end
             end
         end
     end
+    return enemyInstance
 end
 
 function EnemyService:KnitInit()

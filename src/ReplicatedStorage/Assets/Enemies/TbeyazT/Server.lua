@@ -9,6 +9,7 @@ local Assets = ReplicatedStorage:WaitForChild("Assets")
 
 local Knit = require(Packages.Knit)
 local TableUtil = require(Packages.TableUtil)
+local Signal = require(Packages.Signal)
 
 local Enemy = {}
 Enemy.__index = Enemy
@@ -23,6 +24,8 @@ function Enemy.new(Data)
     self.ID = HttpService:GenerateGUID(false)
     self.Player = Data.Player
 
+    self.Died = Signal.new()
+
     self.Health = self.Properties.Health or 100
 
     return self
@@ -36,6 +39,7 @@ function Enemy:TakeDamage(Amount)
         CurrentHealth = self.Health,
     })
     if self.Health <= 0 then
+        self.Died:Fire()
         self:Destroy()
     end
 end
@@ -48,6 +52,11 @@ function Enemy:Destroy()
     if self.Tool then
         self.InventoryService:UnequipTool(nil,self.Tool,self)
         self.Tool = nil
+    end
+
+    if self.Died then
+        self.Died:DisconnectAll()
+        self.Died:Destroy()
     end
 
     setmetatable(self, nil)

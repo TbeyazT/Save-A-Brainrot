@@ -1,30 +1,45 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 
-local Assets = ReplicatedStorage:WaitForChild("Assets")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 
 local Knit = require(Packages.Knit)
-local TableUtil = require(Packages.TableUtil)
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer.PlayerGui
-
-local MainGui = PlayerGui:WaitForChild("MainGui")
 
 local PurchaseController = Knit.CreateController {
 	Name = script.Name
 }
+
+-- Call this from your UI Buttons for Dev Products (Gold, Potions)
+function PurchaseController:PromptProduct(productId)
+	local success, err = pcall(function()
+		MarketplaceService:PromptProductPurchase(LocalPlayer, productId)
+	end)
+	
+	if not success then
+		warn("Failed to prompt product purchase: " .. tostring(err))
+	end
+end
+
+-- Call this from your UI Buttons for Gamepasses (VIP, Double Speed)
+function PurchaseController:PromptGamePass(gamePassId)
+	local success, err = pcall(function()
+		MarketplaceService:PromptGamePassPurchase(LocalPlayer, gamePassId)
+	end)
+
+	if not success then
+		warn("Failed to prompt gamepass purchase: " .. tostring(err))
+	end
+end
 
 function PurchaseController:KnitInit()
 	self.ProfileController = Knit.GetController("ProfileController")
 end
 
 function PurchaseController:KnitStart()
+	-- Wait for data to load
 	local attempts = 0
 	while not self.ProfileController:IsLoaded() do
 		task.wait(0.5)
@@ -34,6 +49,8 @@ function PurchaseController:KnitStart()
 			break
 		end
 	end
+	
+	print("PurchaseController Initialized")
 end
 
 return PurchaseController

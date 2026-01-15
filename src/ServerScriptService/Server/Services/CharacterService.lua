@@ -16,6 +16,16 @@ local NPC_TAG = "NPC"
 local COLLISION_GROUP_NAME = "NpcCollideable"
 local PROJECTILE_GROUP_NAME = "Balls"
 
+export type CharacterData = {
+	Model: Model,
+	Humanoid: Humanoid,
+	RootPart: BasePart,
+	Animator: Animator?,
+	Player: Player?,
+	IsPlayer: boolean,
+	Dumpster: any
+}
+
 local CharacterService = Knit.CreateService {
 	Name = script.Name,
 	Client = {},
@@ -63,7 +73,6 @@ function CharacterService:KnitStart()
 	end
 end
 
---// Internal method to register groups
 function CharacterService:_setupCollisionGroups()
 	local success, err = pcall(function()
 		PhysicsService:RegisterCollisionGroup(PROJECTILE_GROUP_NAME)
@@ -86,7 +95,7 @@ function CharacterService:_applyCollisionGroup(model)
 	end
 end
 
-function CharacterService:RegisterCharacter(model, player)
+function CharacterService:RegisterCharacter(model, player):CharacterData
 	if self._registry[model] then return end
 
 	local humanoid = model:FindFirstChildWhichIsA("Humanoid")

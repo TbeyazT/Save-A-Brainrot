@@ -39,6 +39,7 @@ function EnemyController:SpawnNpc(Data)
             local enemyInstance = EnemyClass.new({
                 Name = Data.Name,
                 ID = Data.ID,
+                CFrame = Data.CFrame
             })
             enemyInstance:Init()
             self._enemies[enemyInstance.ID] = enemyInstance

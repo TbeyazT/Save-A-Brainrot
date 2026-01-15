@@ -13,16 +13,12 @@ HitPartComponent.__index = HitPartComponent
 local activeComponents = {}
 local runServiceConnection = nil
 
-local genericParams = OverlapParams.new()
-genericParams.FilterType = Enum.RaycastFilterType.Exclude
-genericParams.FilterDescendantsInstances = {} 
-
 function HitPartComponent.new(part: BasePart)
 	local self = setmetatable({}, HitPartComponent)
-	
+
 	self.part = part
 	self.currentPlayers = {} -- format: { [Player] = true }
-	
+
 	self.OnTouched = Signal.new()      
 	self.OnTouchEnded = Signal.new()   
 
@@ -46,13 +42,21 @@ function HitPartComponent.updateAll()
 end
 
 function HitPartComponent:checkProximity()
-	if not self.part or not self.part.Parent then 
+	if not self.part then
 		self:Destroy()
-		return 
+		return
+	end
+
+	if not self.part.Parent then
+		for player, _ in pairs(self.currentPlayers) do
+			self.currentPlayers[player] = nil
+			self.OnTouchEnded:Fire(player)
+		end
+		return
 	end
 
 	local foundPlayers = {}
-	
+
 	local partsInPart = workspace:GetPartsInPart(self.part, self.overlapParams)
 
 	for _, hitPart in ipairs(partsInPart) do
@@ -67,7 +71,6 @@ function HitPartComponent:checkProximity()
 
 	for player, _ in pairs(foundPlayers) do
 		if not self.currentPlayers[player] then
-			warn("wow===!")
 			self.currentPlayers[player] = true
 			self.OnTouched:Fire(player)
 		end
@@ -91,7 +94,7 @@ function HitPartComponent:Destroy()
 
 	self.OnTouched:DisconnectAll()
 	self.OnTouchEnded:DisconnectAll()
-	
+
 	self.part = nil
 	self.currentPlayers = nil
 	self.overlapParams = nil
